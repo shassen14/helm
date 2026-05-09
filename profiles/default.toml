@@ -1,0 +1,12 @@
+schema_version = 1
+
+[profile]
+name = "default"
+trigger_apps = []
+deck = "any"
+
+[[profile.buttons]]
+index = 0
+label = "Scene: Coding"
+icon = ""
+action = {type = "http", url = "http://192.168.1.X:8002/scenes/switch", method = "POST", body = {scene = "coding"}}
