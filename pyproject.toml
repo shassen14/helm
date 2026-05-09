@@ -1,0 +1,25 @@
+[project]
+name = "helm"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[project.optional-dependencies]
+helmd = [
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",
+    "pynput",
+    "pillow",
+    "python-elgato-streamdeck",
+]
+mixd = [
+    "fastapi",
+    "uvicorn[standard]",
+]
+
+[project.scripts]
+helmd = "helmd.__main__:main"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.backends.legacy:build"

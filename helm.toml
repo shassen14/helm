@@ -1,0 +1,21 @@
+[helmd]
+host = "127.0.0.1"
+port = 7100
+brightness = 70
+
+[mixd]
+host = "127.0.0.1"
+port = 7101
+
+[services]
+# veil runs on some device — set to LAN IP.
+# helmd and mixd run on this machine — localhost is correct for those.
+veil_url = "http://192.168.1.X:8002"    # TODO: set LAN IP
+
+[switcher]
+enabled = true
+poll_interval_s = 2
+
+[devices]
+# Empty = accept all decks. Or pin specific serials.
+allowed_deck_serials = []
