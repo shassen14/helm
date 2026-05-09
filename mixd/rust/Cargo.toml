@@ -1,0 +1,10 @@
+[package]
+name = "mixd"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mixd"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
