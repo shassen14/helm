@@ -20,6 +20,9 @@ mixd = [
 [project.scripts]
 helmd = "helmd.__main__:main"
 
+[tool.setuptools.packages.find]
+include = ["helmd*", "mixd*", "shared*"]
+
 [build-system]
 requires = ["setuptools"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"

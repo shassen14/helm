@@ -1,7 +1,7 @@
 ---
 type: plan
 status: in-progress
-updated: 2026-05-09
+updated: 2026-05-09 (steps 1–6 complete)
 ---
 
 # helm — build plan
@@ -13,6 +13,7 @@ updated: 2026-05-09
 > devices on day one.
 
 See companion docs:
+
 - `architecture.md` — daemon split, ownership boundaries, data flow
 - `ilities.md` — how each -ility is supported, with concrete mechanisms
 - `risks-and-tradeoffs.md` — what's hard, what we gave up, why
@@ -22,10 +23,10 @@ See companion docs:
 
 ## Scope
 
-| Replaces | helm component | What it does |
-|---|---|---|
-| Elgato Stream Deck app | **helmd** | HID input, button/knob bindings, profiles, action dispatch, web UI |
-| Elgato Wave Link app | **mixd** | Virtual audio mixer, per-app routing, multi-output mixes (Stream / Monitor / Chat) |
+| Replaces               | helm component | What it does                                                                       |
+| ---------------------- | -------------- | ---------------------------------------------------------------------------------- |
+| Elgato Stream Deck app | **helmd**      | HID input, button/knob bindings, profiles, action dispatch, web UI                 |
+| Elgato Wave Link app   | **mixd**       | Virtual audio mixer, per-app routing, multi-output mixes (Stream / Monitor / Chat) |
 
 **helm never owns stateful integrations.** It is input → action mapping. OBS lives in veil.
 Twitch lives in boneless_couch. Audio lives in mixd. helmd is the glue.
@@ -34,11 +35,11 @@ Twitch lives in boneless_couch. Audio lives in mixd. helmd is the glue.
 
 ## Ports
 
-| Service | Bind | Purpose |
-|---|---|---|
+| Service      | Bind           | Purpose                              |
+| ------------ | -------------- | ------------------------------------ |
 | helmd web UI | 127.0.0.1:7100 | Control surface UI + action dispatch |
-| mixd HTTP | 127.0.0.1:7101 | Mixer control plane |
-| veil | 127.0.0.1:8002 | OBS scene control, alerts, overlay |
+| mixd HTTP    | 127.0.0.1:7101 | Mixer control plane                  |
+| veil         | 127.0.0.1:8002 | OBS scene control, alerts, overlay   |
 
 All localhost only. No auth on the local trust boundary. Document this — adding LAN access requires a token, not just `0.0.0.0`.
 
@@ -115,19 +116,19 @@ All Python files <300 lines. No magic strings — enums in `constants.py`. No in
 
 ## Build order
 
-| # | Task | Status | Notes |
-|---|---|---|---|
-| 1 | veil: OBS WebSocket + `/scenes` routes | ✅ done | Confirms OBS ownership stays in veil |
-| 2 | helmd: scaffold (pyproject, packaging dirs) | ✅ done | Full stub tree; imports cleanly |
-| 3 | helmd: core (config, constants, paths, platform, logger) | ⬜ | Platform interface lands here |
-| 4 | helmd: profiles (schema, loader, manager, switcher) | ⬜ | Schema versioned from day one |
-| 5 | helmd: actions (base, types, registry) | ⬜ | Registry pattern |
-| 6 | helmd: web (FastAPI on 7100, /status, profile CRUD, dispatch) | ⬜ | |
-| 7 | helmd: hardware (Surface ABC, StreamDeck adapter, multi-device supervisor) | ⬜ | Multi-device day-one |
-| 8 | helmd: launchd + systemd units | ⬜ | Auto-start on login |
-| 9 | mixd Python skeleton (device enum, HTTP on 7101, route Spotify→Stream / mic→both) | ⬜ | First milestone is functional, not polished |
-| 10 | mixd Rust mix core (cpal + routing matrix + IPC to Python) | ⬜ | Realtime callback, no allocations |
-| 11 | helm web UI mixer panel (binds to mixd HTTP) | ⬜ | Final integration |
+| #   | Task                                                                              | Status  | Notes                                                                              |
+| --- | --------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------- |
+| 1   | veil: OBS WebSocket + `/scenes` routes                                            | ✅ done | Confirms OBS ownership stays in veil                                               |
+| 2   | helmd: scaffold (pyproject, packaging dirs)                                       | ✅ done | Full stub tree; imports cleanly                                                    |
+| 3   | helmd: core (config, constants, paths, platform, logger)                          | ✅ done | Mac (osascript) + Linux (xdotool) backends; pynput chord send_keys                 |
+| 4   | helmd: profiles (schema, loader, manager, switcher)                               | ✅ done | discover() globs user profiles dir; switcher polls active window every N s         |
+| 5   | helmd: actions (base, types, registry)                                            | ✅ done | HTTP/shell/keypress/multi all wired; multi uses local import to break circular ref |
+| 6   | helmd: web (FastAPI on 7100, /status, profile CRUD, dispatch)                     | ✅ done | Factory pattern (create_app); state passed via app.state; all routes live          |
+| 7   | helmd: hardware (Surface ABC, StreamDeck adapter, multi-device supervisor)        | ⬜      | Multi-device day-one                                                               |
+| 8   | helmd: launchd + systemd units                                                    | ⬜      | Auto-start on login                                                                |
+| 9   | mixd Python skeleton (device enum, HTTP on 7101, route Spotify→Stream / mic→both) | ⬜      | First milestone is functional, not polished                                        |
+| 10  | mixd Rust mix core (cpal + routing matrix + IPC to Python)                        | ⬜      | Realtime callback, no allocations                                                  |
+| 11  | helm web UI mixer panel (binds to mixd HTTP)                                      | ⬜      | Final integration                                                                  |
 
 Steps 1–8 ship a Stream Deck replacement. Steps 9–11 ship the Wave Link replacement.
 
@@ -166,6 +167,7 @@ on_press = {type = "http", url = "http://localhost:7101/channels/mic/mute", meth
 ```
 
 User profiles live outside the repo so updates don't clobber:
+
 - macOS: `~/Library/Application Support/helm/profiles/`
 - Linux: `~/.config/helm/profiles/` (XDG)
 
