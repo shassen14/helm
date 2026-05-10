@@ -8,6 +8,7 @@ from helmd.core.config import load_config
 from helmd.core.logger import setup_logging
 from helmd.core.paths import HelmPaths
 from helmd.core.platform import get_platform
+from helmd.hardware.supervisor import SurfaceManager
 from helmd.profiles.manager import ProfileManager
 from helmd.profiles.switcher import ProfileSwitcher
 from helmd.web.server import serve
@@ -26,7 +27,19 @@ async def _main() -> None:
     manager = ProfileManager()
     manager.discover(paths)
 
-    state = SimpleNamespace(manager=manager, platform=plat, version=_VERSION)
+    surface_manager = SurfaceManager(
+        manager=manager,
+        devices_config=settings.devices,
+        brightness=settings.helmd.brightness,
+    )
+
+    state = SimpleNamespace(
+        manager=manager,
+        platform=plat,
+        version=_VERSION,
+        surface_manager=surface_manager,
+    )
+
     threading.Thread(
         target=serve,
         args=(state,),
@@ -34,10 +47,12 @@ async def _main() -> None:
         daemon=True,
     ).start()
 
-    if settings.switcher.enabled:
-        await ProfileSwitcher(plat, manager, settings.switcher.poll_interval_s).run()
-    else:
-        await asyncio.Event().wait()
+    async with asyncio.TaskGroup() as tg:
+        tg.create_task(surface_manager.run())
+        if settings.switcher.enabled:
+            tg.create_task(ProfileSwitcher(plat, manager, settings.switcher.poll_interval_s).run())
+        else:
+            tg.create_task(asyncio.Event().wait())
 
 
 def main() -> None:

@@ -11,6 +11,7 @@ def create_app(state: SimpleNamespace) -> FastAPI:
     app.state.manager = state.manager
     app.state.platform = state.platform
     app.state.version = state.version
+    app.state.surface_manager = state.surface_manager
     app.include_router(ui.router)
     app.include_router(profiles.router)
     app.include_router(actions.router)

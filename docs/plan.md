@@ -1,7 +1,7 @@
 ---
 type: plan
 status: in-progress
-updated: 2026-05-09 (steps 1–6 complete)
+updated: 2026-05-10 (steps 1–8 complete)
 ---
 
 # helm — build plan
@@ -124,8 +124,8 @@ All Python files <300 lines. No magic strings — enums in `constants.py`. No in
 | 4   | helmd: profiles (schema, loader, manager, switcher)                               | ✅ done | discover() globs user profiles dir; switcher polls active window every N s         |
 | 5   | helmd: actions (base, types, registry)                                            | ✅ done | HTTP/shell/keypress/multi all wired; multi uses local import to break circular ref |
 | 6   | helmd: web (FastAPI on 7100, /status, profile CRUD, dispatch)                     | ✅ done | Factory pattern (create_app); state passed via app.state; all routes live          |
-| 7   | helmd: hardware (Surface ABC, StreamDeck adapter, multi-device supervisor)        | ⬜      | Multi-device day-one                                                               |
-| 8   | helmd: launchd + systemd units                                                    | ⬜      | Auto-start on login                                                                |
+| 7   | helmd: hardware (Surface ABC, StreamDeck adapter, multi-device supervisor)        | ✅ done | Hot-plug poll loop; path-based dedup avoids re-opening held HID handle; dial/key callbacks bridged to asyncio via run_coroutine_threadsafe |
+| 8   | helmd: launchd + systemd units                                                    | ✅ done | Token-template plist + service; install.sh detects Python, OS, log dir, loads unit |
 | 9   | mixd Python skeleton (device enum, HTTP on 7101, route Spotify→Stream / mic→both) | ⬜      | First milestone is functional, not polished                                        |
 | 10  | mixd Rust mix core (cpal + routing matrix + IPC to Python)                        | ⬜      | Realtime callback, no allocations                                                  |
 | 11  | helm web UI mixer panel (binds to mixd HTTP)                                      | ⬜      | Final integration                                                                  |

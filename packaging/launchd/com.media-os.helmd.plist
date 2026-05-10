@@ -7,7 +7,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/python3</string>
+        <string>{{PYTHON_EXECUTABLE}}</string>
         <string>-m</string>
         <string>helmd</string>
     </array>
@@ -18,10 +18,16 @@
     <key>KeepAlive</key>
     <true/>
 
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>WorkingDirectory</key>
+    <string>{{HOME}}</string>
+
     <key>StandardOutPath</key>
-    <string>/Users/PLACEHOLDER/Library/Application Support/helm/logs/helmd.log</string>
+    <string>{{HOME}}/Library/Application Support/helm/logs/helmd.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/PLACEHOLDER/Library/Application Support/helm/logs/helmd.err</string>
+    <string>{{HOME}}/Library/Application Support/helm/logs/helmd.err</string>
 </dict>
 </plist>

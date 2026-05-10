@@ -26,3 +26,13 @@ class DeckModel(StrEnum):
     XL = "xl"
     PLUS = "plus"
     PEDAL = "pedal"
+
+
+class DeckEvent(StrEnum):
+    DIAL_TURN = "dial_turn"
+    DIAL_PRESS = "dial_press"
+    DIAL_RELEASE = "dial_release"
+
+
+# Default button background colour used when a profile does not specify one.
+DEFAULT_BUTTON_COLOR: tuple[int, int, int] = (30, 30, 30)

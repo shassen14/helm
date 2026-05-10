@@ -4,9 +4,11 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 -m helmd
-Restart=always
-RestartSec=3
+ExecStart={{PYTHON_EXECUTABLE}} -m helmd
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:%h/.config/helm/logs/helmd.log
+StandardError=append:%h/.config/helm/logs/helmd.err
 
 [Install]
 WantedBy=default.target
