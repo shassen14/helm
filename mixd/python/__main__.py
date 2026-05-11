@@ -5,6 +5,7 @@ from pathlib import Path
 
 from mixd.python.config import load_config
 from mixd.python.devices import list_devices
+from mixd.python.engine import MixEngine
 from mixd.python.server import serve
 from mixd.python.state import default_state
 
@@ -20,16 +21,22 @@ async def _main() -> None:
     mixer = default_state()
     mixer.devices = list_devices()
 
+    engine = MixEngine()
+    engine.sync_state(mixer)
+
     _log.info("mixd listening on %s:%d", settings.host, settings.port)
 
     threading.Thread(
         target=serve,
-        args=(mixer,),
+        args=(mixer, engine),
         kwargs={"host": settings.host, "port": settings.port},
         daemon=True,
     ).start()
 
-    await asyncio.Event().wait()
+    try:
+        await asyncio.Event().wait()
+    finally:
+        engine.close()
 
 
 def main() -> None:

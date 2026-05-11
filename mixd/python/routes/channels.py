@@ -34,6 +34,7 @@ async def set_level(channel: str, body: LevelBody, request: Request) -> dict:
     if channel not in mixer.channels:
         raise HTTPException(status_code=404, detail=f"unknown channel: {channel}")
     mixer.channels[channel].level = body.level
+    request.app.state.engine.set_level(channel, body.level)
     ch = mixer.channels[channel]
     return {"name": channel, "level": ch.level, "muted": ch.muted, "outputs": ch.outputs}
 
@@ -44,5 +45,6 @@ async def set_mute(channel: str, body: MuteBody, request: Request) -> dict:
     if channel not in mixer.channels:
         raise HTTPException(status_code=404, detail=f"unknown channel: {channel}")
     mixer.channels[channel].muted = body.muted
+    request.app.state.engine.set_muted(channel, body.muted)
     ch = mixer.channels[channel]
     return {"name": channel, "level": ch.level, "muted": ch.muted, "outputs": ch.outputs}

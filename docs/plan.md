@@ -127,7 +127,7 @@ All Python files <300 lines. No magic strings — enums in `constants.py`. No in
 | 7   | helmd: hardware (Surface ABC, StreamDeck adapter, multi-device supervisor)        | ✅ done | Hot-plug poll loop; path-based dedup avoids re-opening held HID handle; dial/key callbacks bridged to asyncio via run_coroutine_threadsafe |
 | 8   | helmd: launchd + systemd units                                                    | ✅ done | Token-template plist + service; install.sh detects Python, OS, log dir, loads unit |
 | 9   | mixd Python skeleton (device enum, HTTP on 7101, route Spotify→Stream / mic→both) | ✅ done | constants/state/devices/routes/server all wired; factory pattern matches helmd     |
-| 10  | mixd Rust mix core (cpal + routing matrix + IPC to Python)                        | ⬜      | Realtime callback, no allocations                                                  |
+| 10  | mixd Rust mix core (cpal + routing matrix + IPC to Python)                        | ✅      | Realtime callback, no allocations                                                  |
 | 11  | helm web UI mixer panel (binds to mixd HTTP)                                      | ⬜      | Final integration                                                                  |
 
 Steps 1–8 ship a Stream Deck replacement. Steps 9–11 ship the Wave Link replacement.

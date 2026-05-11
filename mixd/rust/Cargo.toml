@@ -8,3 +8,4 @@ name = "mixd"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+cpal = "0.15"

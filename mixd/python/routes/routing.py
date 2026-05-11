@@ -27,4 +27,5 @@ async def set_routing(channel: str, body: RoutingBody, request: Request) -> dict
     if invalid:
         raise HTTPException(status_code=422, detail=f"unknown outputs: {invalid}")
     mixer.channels[channel].outputs = body.outputs
+    request.app.state.engine.set_outputs(channel, body.outputs)
     return {"channel": channel, "outputs": mixer.channels[channel].outputs}
