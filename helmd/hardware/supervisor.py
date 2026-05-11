@@ -203,7 +203,11 @@ class SurfaceManager:
         try:
             from helmd.actions.registry import create_action
 
-            await create_action(action_config).execute()
+            resolved = {
+                k: v.replace("{delta}", str(value)) if isinstance(v, str) else v
+                for k, v in action_config.items()
+            }
+            await create_action(resolved).execute()
         except Exception as exc:
             _log.error("Action error for dial %d event %s: %s", index, event, exc)
 

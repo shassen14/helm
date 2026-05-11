@@ -5,8 +5,37 @@ name = "default"
 trigger_apps = []
 deck = "any"
 
+# Button 0 — shell action (audible, no external deps)
 [[profile.buttons]]
 index = 0
+label = "Say Hello"
+icon = ""
+action = {type = "shell", command = "say hello from helm"}
+
+# Button 1 — keypress action (switches app)
+[[profile.buttons]]
+index = 1
+label = "App Switch"
+icon = ""
+action = {type = "keypress", keys = ["cmd", "tab"]}
+
+# Button 2 — HTTP to veil (set your Pi IP in helm.toml services.veil_url)
+[[profile.buttons]]
+index = 2
 label = "Scene: Coding"
 icon = ""
 action = {type = "http", url = "http://192.168.1.X:8002/scenes/switch", method = "POST", body = {scene = "coding"}}
+
+# Button 3 — HTTP to veil
+[[profile.buttons]]
+index = 3
+label = "Scene: Gaming"
+icon = ""
+action = {type = "http", url = "http://192.168.1.X:8002/scenes/switch", method = "POST", body = {scene = "gaming"}}
+
+# Knob 0 — system volume (no external deps; delta substitution is a future feature — fixed steps for now)
+[[profile.knobs]]
+index = 0
+label = "Volume"
+on_turn = {type = "shell", command = "osascript -e 'set volume output volume ((output volume of (get volume settings)) + ({delta} * 5))'"}
+on_press = {type = "shell", command = "osascript -e 'if output muted of (get volume settings) is true then' -e 'set volume without output muted' -e 'else' -e 'set volume with output muted' -e 'end if'"}
