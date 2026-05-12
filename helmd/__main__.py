@@ -33,11 +33,14 @@ async def _main() -> None:
         brightness=settings.helmd.brightness,
     )
 
+    mixd_base_url = f"http://{settings.mixd.host}:{settings.mixd.port}"
+
     state = SimpleNamespace(
         manager=manager,
         platform=plat,
         version=_VERSION,
         surface_manager=surface_manager,
+        mixd_base_url=mixd_base_url,
     )
 
     threading.Thread(
