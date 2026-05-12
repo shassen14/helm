@@ -1,7 +1,7 @@
 use std::array;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-pub const N_CHANNELS: usize = 3;
+pub const N_CHANNELS: usize = 16;
 
 pub const OUT_STREAM: u32 = 0b001;
 pub const OUT_MONITOR: u32 = 0b010;

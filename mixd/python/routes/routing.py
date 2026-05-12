@@ -15,17 +15,18 @@ class RoutingBody(BaseModel):
 @router.get("/routing")
 async def get_routing(request: Request) -> dict:
     mixer = request.app.state.mixer
-    return {name: ch.outputs for name, ch in mixer.channels.items()}
+    return {cid: ch.outputs for cid, ch in mixer.channels.items()}
 
 
 @router.put("/routing/{channel}")
 async def set_routing(channel: str, body: RoutingBody, request: Request) -> dict:
     mixer = request.app.state.mixer
-    if channel not in mixer.channels:
+    ch = mixer.channels.get(channel)
+    if ch is None:
         raise HTTPException(status_code=404, detail=f"unknown channel: {channel}")
     invalid = [o for o in body.outputs if o not in _VALID_OUTPUTS]
     if invalid:
         raise HTTPException(status_code=422, detail=f"unknown outputs: {invalid}")
-    mixer.channels[channel].outputs = body.outputs
-    request.app.state.engine.set_outputs(channel, body.outputs)
-    return {"channel": channel, "outputs": mixer.channels[channel].outputs}
+    ch.outputs = body.outputs
+    request.app.state.engine.set_outputs(ch.slot, body.outputs)
+    return {"channel": channel, "outputs": ch.outputs}

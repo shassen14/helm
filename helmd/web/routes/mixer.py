@@ -33,6 +33,22 @@ async def get_channels(request: Request) -> Response:
     return await _proxy(request, "GET", "/channels")
 
 
+@router.post("/channels")
+async def create_channel(request: Request) -> Response:
+    body = await request.json()
+    return await _proxy(request, "POST", "/channels", json=body)
+
+
+@router.delete("/channels/{channel}")
+async def delete_channel(channel: str, request: Request) -> Response:
+    return await _proxy(request, "DELETE", f"/channels/{channel}")
+
+
+@router.get("/apps")
+async def get_apps(request: Request) -> Response:
+    return await _proxy(request, "GET", "/apps")
+
+
 @router.post("/channels/{channel}/level")
 async def set_level(channel: str, request: Request) -> Response:
     body = await request.json()

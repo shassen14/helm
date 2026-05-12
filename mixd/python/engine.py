@@ -5,21 +5,9 @@ import logging
 import platform
 from pathlib import Path
 
-from mixd.python.constants import ChannelName, MixOutput
+from mixd.python.constants import OUTPUT_BITS, ChannelKind
 
 _log = logging.getLogger(__name__)
-
-_CHANNEL_IDX: dict[str, int] = {
-    ChannelName.SPOTIFY: 0,
-    ChannelName.MIC: 1,
-    ChannelName.DESKTOP: 2,
-}
-
-_OUTPUT_BIT: dict[str, int] = {
-    MixOutput.STREAM: 0b001,
-    MixOutput.MONITOR: 0b010,
-    MixOutput.CHAT: 0b100,
-}
 
 
 def _lib_path() -> Path:
@@ -50,6 +38,14 @@ def _load_lib() -> ctypes.CDLL | None:
     lib.mixd_set_muted.restype = None
     lib.mixd_set_outputs.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32]
     lib.mixd_set_outputs.restype = None
+    lib.mixd_start_capture_app.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_char_p]
+    lib.mixd_start_capture_app.restype = ctypes.c_int32
+    lib.mixd_start_capture_mic.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    lib.mixd_start_capture_mic.restype = ctypes.c_int32
+    lib.mixd_start_capture_system.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    lib.mixd_start_capture_system.restype = ctypes.c_int32
+    lib.mixd_stop_capture.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    lib.mixd_stop_capture.restype = ctypes.c_int32
     return lib
 
 
@@ -70,35 +66,50 @@ class MixEngine:
         return self._ptr is not None
 
     def sync_state(self, mixer) -> None:
-        for name, ch in mixer.channels.items():
-            self.set_level(name, ch.level)
-            self.set_muted(name, ch.muted)
-            self.set_outputs(name, ch.outputs)
+        for ch in mixer.channels.values():
+            self.set_level(ch.slot, ch.level)
+            self.set_muted(ch.slot, ch.muted)
+            self.set_outputs(ch.slot, ch.outputs)
 
-    def set_level(self, channel: str, gain: float) -> None:
+    def set_level(self, slot: int, gain: float) -> None:
         if not self.available:
             return
-        if (idx := _CHANNEL_IDX.get(channel)) is None:
-            return
-        self._lib.mixd_set_level(self._ptr, idx, gain)
+        self._lib.mixd_set_level(self._ptr, slot, gain)
 
-    def set_muted(self, channel: str, muted: bool) -> None:
+    def set_muted(self, slot: int, muted: bool) -> None:
         if not self.available:
             return
-        if (idx := _CHANNEL_IDX.get(channel)) is None:
-            return
-        self._lib.mixd_set_muted(self._ptr, idx, int(muted))
+        self._lib.mixd_set_muted(self._ptr, slot, int(muted))
 
-    def set_outputs(self, channel: str, outputs: list[str]) -> None:
+    def set_outputs(self, slot: int, outputs: list[str]) -> None:
         if not self.available:
-            return
-        if (idx := _CHANNEL_IDX.get(channel)) is None:
             return
         mask = 0
         for o in outputs:
-            if (bit := _OUTPUT_BIT.get(o)) is not None:
+            if (bit := OUTPUT_BITS.get(o)) is not None:
                 mask |= bit
-        self._lib.mixd_set_outputs(self._ptr, idx, mask)
+        self._lib.mixd_set_outputs(self._ptr, slot, mask)
+
+    def start_capture(self, slot: int, kind: ChannelKind, source_id: str | None) -> bool:
+        if not self.available:
+            return False
+        match kind:
+            case ChannelKind.APP:
+                if not source_id:
+                    return False
+                rc = self._lib.mixd_start_capture_app(self._ptr, slot, source_id.encode())
+            case ChannelKind.MIC:
+                rc = self._lib.mixd_start_capture_mic(self._ptr, slot)
+            case ChannelKind.SYSTEM:
+                rc = self._lib.mixd_start_capture_system(self._ptr, slot)
+            case _:
+                return False
+        return rc == 0
+
+    def stop_capture(self, slot: int) -> None:
+        if not self.available:
+            return
+        self._lib.mixd_stop_capture(self._ptr, slot)
 
     def close(self) -> None:
         if self._ptr is not None and self._lib is not None:

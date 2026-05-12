@@ -2,7 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from mixd.python.engine import MixEngine
-from mixd.python.routes import channels, devices, routing, status
+from mixd.python.routes import apps, channels, devices, routing, status
 from mixd.python.state import MixerState
 
 
@@ -14,6 +14,7 @@ def create_app(mixer: MixerState, engine: MixEngine) -> FastAPI:
     app.include_router(devices.router)
     app.include_router(channels.router)
     app.include_router(routing.router)
+    app.include_router(apps.router)
     return app
 
 

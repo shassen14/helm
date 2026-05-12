@@ -24,11 +24,18 @@ _MIXER_HTML = """<!DOCTYPE html>
 <style>
   body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 1.5rem; max-width: 720px; }
   h1 { margin: 0 0 1rem; font-size: 1.25rem; }
+  h2 { margin: 1.25rem 0 .5rem; font-size: 1rem; color: #333; }
   .channel { border: 1px solid #ccc; border-radius: 6px; padding: .75rem 1rem; margin-bottom: .75rem; }
   .row { display: flex; align-items: center; gap: .75rem; margin: .25rem 0; }
   .name { font-weight: 600; min-width: 7rem; }
+  .kind { color: #777; font-size: .8rem; font-weight: normal; margin-left: .35rem; }
   .level { flex: 1; }
   .outputs label { margin-right: .75rem; font-size: .9rem; }
+  .remove { margin-left: auto; background: none; border: 1px solid #ccc; border-radius: 4px; padding: .15rem .5rem; cursor: pointer; font-size: .8rem; }
+  .remove:hover { background: #fee; border-color: #b00; color: #b00; }
+  .add { display: flex; gap: .5rem; align-items: center; }
+  .add select { flex: 1; padding: .35rem; }
+  .add button { padding: .35rem .75rem; cursor: pointer; }
   footer { margin-top: 1.5rem; padding-top: .75rem; border-top: 1px solid #ddd; color: #555; font-size: .85rem; }
   .err { color: #b00; }
 </style>
@@ -36,15 +43,22 @@ _MIXER_HTML = """<!DOCTYPE html>
 <body>
 <h1>mixer</h1>
 <div id="channels">loading…</div>
+
+<h2>add channel</h2>
+<div class="add">
+  <select id="add-source"><option value="">loading apps…</option></select>
+  <button id="add-btn">add</button>
+</div>
+
 <footer id="footer">connecting to mixd…</footer>
 
 <script>
-const BASELINE_OUTPUTS = ["stream", "monitor", "chat"];
+const OUTPUTS = ["stream", "monitor", "chat"];
 const POLL_MS = 2000;
 const LEVEL_DEBOUNCE_MS = 80;
 
-let outputNames = [...BASELINE_OUTPUTS];
 const levelTimers = {};
+let appsCache = [];
 
 async function api(method, path, body) {
   const opts = { method, headers: {} };
@@ -53,45 +67,39 @@ async function api(method, path, body) {
     opts.body = JSON.stringify(body);
   }
   const r = await fetch(path, opts);
-  if (!r.ok) throw new Error(`${method} ${path} → ${r.status}`);
-  return r.json();
-}
-
-function unionOutputs(routing) {
-  const s = new Set(BASELINE_OUTPUTS);
-  for (const outs of Object.values(routing || {})) {
-    for (const o of outs) s.add(o);
+  if (!r.ok) {
+    let detail = `${method} ${path} → ${r.status}`;
+    try { const j = await r.json(); if (j.detail) detail += `: ${j.detail}`; } catch (_) {}
+    throw new Error(detail);
   }
-  return [...s];
+  if (r.status === 204) return null;
+  return r.json();
 }
 
 function renderChannels(channels) {
   const root = document.getElementById("channels");
   root.innerHTML = "";
-  const names = Object.keys(channels).sort();
-  if (!names.length) {
-    root.textContent = "no channels";
+  const ids = Object.keys(channels).sort((a, b) => channels[a].slot - channels[b].slot);
+  if (!ids.length) {
+    root.textContent = "no channels yet — add one below";
     return;
   }
-  for (const name of names) {
-    const ch = channels[name];
+  for (const id of ids) {
+    const ch = channels[id];
     const card = document.createElement("div");
     card.className = "channel";
-    card.dataset.channel = name;
+    card.dataset.channel = id;
 
     const top = document.createElement("div");
     top.className = "row";
-    top.innerHTML = `<span class="name">${name}</span>`;
-
-    const muteLbl = document.createElement("label");
-    const muteBox = document.createElement("input");
-    muteBox.type = "checkbox";
-    muteBox.checked = !!ch.muted;
-    muteBox.addEventListener("change", async () => {
-      try { await api("POST", `/mixer/channels/${name}/mute`, { muted: muteBox.checked }); }
-      catch (e) { setFooter(`mute failed: ${e.message}`, true); }
-    });
-    muteLbl.append(muteBox, " mute");
+    const label = document.createElement("span");
+    label.className = "name";
+    label.textContent = ch.name;
+    const kindTag = document.createElement("span");
+    kindTag.className = "kind";
+    kindTag.textContent = ch.kind;
+    label.append(kindTag);
+    top.append(label);
 
     const slider = document.createElement("input");
     slider.type = "range";
@@ -99,20 +107,41 @@ function renderChannels(channels) {
     slider.value = ch.level;
     slider.className = "level";
     slider.addEventListener("input", () => {
-      clearTimeout(levelTimers[name]);
-      levelTimers[name] = setTimeout(async () => {
-        try { await api("POST", `/mixer/channels/${name}/level`, { level: parseFloat(slider.value) }); }
+      clearTimeout(levelTimers[id]);
+      levelTimers[id] = setTimeout(async () => {
+        try { await api("POST", `/mixer/channels/${encodeURIComponent(id)}/level`, { level: parseFloat(slider.value) }); }
         catch (e) { setFooter(`level failed: ${e.message}`, true); }
       }, LEVEL_DEBOUNCE_MS);
     });
+    top.append(slider);
 
-    top.append(slider, muteLbl);
+    const muteLbl = document.createElement("label");
+    const muteBox = document.createElement("input");
+    muteBox.type = "checkbox";
+    muteBox.checked = !!ch.muted;
+    muteBox.addEventListener("change", async () => {
+      try { await api("POST", `/mixer/channels/${encodeURIComponent(id)}/mute`, { muted: muteBox.checked }); }
+      catch (e) { setFooter(`mute failed: ${e.message}`, true); }
+    });
+    muteLbl.append(muteBox, " mute");
+    top.append(muteLbl);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "remove";
+    removeBtn.textContent = "remove";
+    removeBtn.addEventListener("click", async () => {
+      try {
+        await api("DELETE", `/mixer/channels/${encodeURIComponent(id)}`);
+        await refresh();
+      } catch (e) { setFooter(`remove failed: ${e.message}`, true); }
+    });
+    top.append(removeBtn);
     card.append(top);
 
     const outRow = document.createElement("div");
     outRow.className = "row outputs";
     const current = new Set(ch.outputs || []);
-    for (const out of outputNames) {
+    for (const out of OUTPUTS) {
       const lbl = document.createElement("label");
       const box = document.createElement("input");
       box.type = "checkbox";
@@ -120,8 +149,8 @@ function renderChannels(channels) {
       box.addEventListener("change", async () => {
         const boxes = outRow.querySelectorAll("input[type=checkbox]");
         const outs = [];
-        boxes.forEach((b, i) => { if (b.checked) outs.push(outputNames[i]); });
-        try { await api("PUT", `/mixer/routing/${name}`, { outputs: outs }); }
+        boxes.forEach((b, i) => { if (b.checked) outs.push(OUTPUTS[i]); });
+        try { await api("PUT", `/mixer/routing/${encodeURIComponent(id)}`, { outputs: outs }); }
         catch (e) { setFooter(`routing failed: ${e.message}`, true); }
       });
       lbl.append(box, " " + out);
@@ -130,6 +159,44 @@ function renderChannels(channels) {
     card.append(outRow);
     root.append(card);
   }
+}
+
+function renderAddOptions(apps, existingIds) {
+  const sel = document.getElementById("add-source");
+  sel.innerHTML = "";
+  const opts = [];
+  if (!existingIds.has("mic")) opts.push({ value: "mic", label: "Mic (input device)" });
+  if (!existingIds.has("system")) opts.push({ value: "system", label: "System (full mix)" });
+  for (const a of apps) {
+    if (!existingIds.has(a.bundleIdentifier)) {
+      opts.push({ value: `app:${a.bundleIdentifier}`, label: `${a.applicationName} (${a.bundleIdentifier})` });
+    }
+  }
+  if (!opts.length) {
+    sel.innerHTML = "<option value=''>nothing left to add</option>";
+    return;
+  }
+  for (const o of opts) {
+    const el = document.createElement("option");
+    el.value = o.value;
+    el.textContent = o.label;
+    sel.append(el);
+  }
+}
+
+async function addChannel() {
+  const sel = document.getElementById("add-source");
+  const v = sel.value;
+  if (!v) return;
+  let body;
+  if (v === "mic") body = { kind: "mic", outputs: ["stream", "monitor"] };
+  else if (v === "system") body = { kind: "system", outputs: ["stream", "monitor"] };
+  else if (v.startsWith("app:")) body = { kind: "app", bundle_id: v.slice(4), outputs: ["stream"] };
+  else return;
+  try {
+    await api("POST", "/mixer/channels", body);
+    await refresh();
+  } catch (e) { setFooter(`add failed: ${e.message}`, true); }
 }
 
 function setFooter(msg, isErr) {
@@ -142,6 +209,7 @@ async function refresh() {
   try {
     const channels = await api("GET", "/mixer/channels");
     renderChannels(channels);
+    renderAddOptions(appsCache, new Set(Object.keys(channels)));
     setFooter(`mixd ok · ${Object.keys(channels).length} channels`);
   } catch (e) {
     setFooter("mixd unreachable", true);
@@ -149,10 +217,9 @@ async function refresh() {
 }
 
 async function init() {
-  try {
-    const routing = await api("GET", "/mixer/routing");
-    outputNames = unionOutputs(routing);
-  } catch (e) { /* fall back to baseline */ }
+  try { appsCache = await api("GET", "/mixer/apps"); }
+  catch (e) { appsCache = []; setFooter(`apps unavailable: ${e.message}`, true); }
+  document.getElementById("add-btn").addEventListener("click", addChannel);
   await refresh();
   setInterval(refresh, POLL_MS);
 }
