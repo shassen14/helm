@@ -1,39 +1,22 @@
 use std::sync::Arc;
 
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-
-use crate::routing::{RoutingMatrix, N_CHANNELS};
+use crate::backends::{make_backend, AudioBackend, CaptureSource};
+use crate::mixer::Mixer;
+use crate::routing::RoutingMatrix;
 
 pub struct Engine {
+    pub mixer: Arc<Mixer>,
     pub matrix: Arc<RoutingMatrix>,
-    _streams: Vec<cpal::Stream>,
+    backend: Box<dyn AudioBackend>,
 }
 
 impl Engine {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let host = cpal::default_host();
-        let matrix = Arc::new(RoutingMatrix::new());
-
-        let in_dev = host.default_input_device().ok_or("no input device")?;
-        let in_cfg = in_dev.default_input_config()?;
-
-        let m_in = Arc::clone(&matrix);
-        let in_stream = in_dev.build_input_stream(
-            &in_cfg.into(),
-            move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                for (i, &sample) in data.iter().enumerate() {
-                    let ch = i % N_CHANNELS;
-                    let gain = if m_in.is_muted(ch) { 0.0 } else { m_in.gain(ch) * sample };
-                    let _mask = m_in.output_mask(ch);
-                    let _ = gain;
-                }
-            },
-            |err| eprintln!("input error: {err}"),
-            None,
-        )?;
-        in_stream.play()?;
-
-        Ok(Self { matrix, _streams: vec![in_stream] })
+        let mixer = Arc::new(Mixer::new());
+        let matrix = Arc::clone(&mixer.matrix);
+        let mut backend = make_backend(Arc::clone(&mixer));
+        backend.open_output()?;
+        Ok(Self { mixer, matrix, backend })
     }
 
     pub fn set_level(&self, ch: usize, gain: f32) {
@@ -46,5 +29,17 @@ impl Engine {
 
     pub fn set_outputs(&self, ch: usize, mask: u32) {
         self.matrix.set_outputs(ch, mask);
+    }
+
+    pub fn start_capture(
+        &mut self,
+        ch: usize,
+        source: CaptureSource,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.backend.start_capture(ch, source)
+    }
+
+    pub fn stop_capture(&mut self, ch: usize) -> Result<(), Box<dyn std::error::Error>> {
+        self.backend.stop_capture(ch)
     }
 }
