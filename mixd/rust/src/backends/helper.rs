@@ -14,7 +14,7 @@ use std::thread::{self, JoinHandle};
 use super::wire::{self, WireResult};
 use super::{cpal_io, AudioBackend, BackendError, BackendResult, CaptureSource};
 use crate::mixer::Mixer;
-use crate::routing::{N_CHANNELS, OUT_STREAM};
+use crate::routing::{BUS_BITS, N_BUSES, N_CHANNELS};
 
 /// OS-specific knowledge needed to launch a `wire`-speaking helper binary.
 /// Implementors should be cheap to construct and free of any mutable state.
@@ -58,7 +58,7 @@ pub struct HelperBackend<L: HelperLocator> {
     mixer: Arc<Mixer>,
     locator: L,
     captures: [Option<CaptureHandle>; N_CHANNELS],
-    output_stream: Option<cpal::Stream>,
+    bus_streams: [Option<cpal::Stream>; N_BUSES],
 }
 
 impl<L: HelperLocator> HelperBackend<L> {
@@ -67,7 +67,7 @@ impl<L: HelperLocator> HelperBackend<L> {
             mixer,
             locator,
             captures: Default::default(),
-            output_stream: None,
+            bus_streams: Default::default(),
         }
     }
 
@@ -134,11 +134,29 @@ impl<L: HelperLocator> HelperBackend<L> {
 }
 
 impl<L: HelperLocator> AudioBackend for HelperBackend<L> {
-    fn open_output(&mut self) -> BackendResult<()> {
-        let stream = cpal_io::open_default_output_stream(Arc::clone(&self.mixer), OUT_STREAM)
-            .map_err(|e| -> BackendError { e.to_string().into() })?;
-        self.output_stream = Some(stream);
+    fn open_bus(&mut self, bus: usize, device_name: Option<&str>) -> BackendResult<()> {
+        if bus >= N_BUSES {
+            return Err(format!("bus {bus} out of range").into());
+        }
+        self.bus_streams[bus] = None;
+        let stream = cpal_io::open_output_stream_on(
+            Arc::clone(&self.mixer),
+            BUS_BITS[bus],
+            device_name,
+        )
+        .map_err(|e| -> BackendError { e.to_string().into() })?;
+        self.bus_streams[bus] = Some(stream);
         Ok(())
+    }
+
+    fn close_bus(&mut self, bus: usize) {
+        if bus < N_BUSES {
+            self.bus_streams[bus] = None;
+        }
+    }
+
+    fn list_output_devices(&self) -> Vec<String> {
+        cpal_io::list_output_devices()
     }
 
     fn start_capture(&mut self, channel: usize, source: CaptureSource) -> BackendResult<()> {

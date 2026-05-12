@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from mixd.python.constants import MAX_CHANNELS, ChannelKind
+from mixd.python.constants import MAX_CHANNELS, ChannelKind, MixOutput
 from mixd.python.devices import AudioDevice
 
 
@@ -29,9 +29,27 @@ class ChannelState:
 
 
 @dataclass
+class BusState:
+    """One output bus (stream / monitor / chat).
+
+    `device_name` is the cpal device name from `mixd_list_output_devices`; an
+    empty string / None means "use OS default". `volume` is the per-bus master
+    gain applied on top of every channel's own gain.
+    """
+
+    volume: float = 1.0
+    device_name: str | None = None
+
+
+def _default_buses() -> dict[str, BusState]:
+    return {bus.value: BusState() for bus in MixOutput}
+
+
+@dataclass
 class MixerState:
     channels: dict[str, ChannelState] = field(default_factory=dict)
     devices: list[AudioDevice] = field(default_factory=list)
+    buses: dict[str, BusState] = field(default_factory=_default_buses)
 
     def allocate_slot(self) -> int | None:
         used = {ch.slot for ch in self.channels.values()}

@@ -29,4 +29,5 @@ async def set_routing(channel: str, body: RoutingBody, request: Request) -> dict
         raise HTTPException(status_code=422, detail=f"unknown outputs: {invalid}")
     ch.outputs = body.outputs
     request.app.state.engine.set_outputs(ch.slot, body.outputs)
+    request.app.state.persist()
     return {"channel": channel, "outputs": ch.outputs}

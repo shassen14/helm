@@ -1,0 +1,31 @@
+[buses.stream]
+volume = 0.44
+device_name = ""
+
+[buses.monitor]
+volume = 0.43
+device_name = ""
+
+[buses.chat]
+volume = 0.4
+device_name = ""
+
+[[channels]]
+id = "mic"
+name = "Mic"
+kind = "mic"
+slot = 0
+source_id = ""
+level = 1.0
+muted = false
+outputs = []
+
+[[channels]]
+id = "system"
+name = "System"
+kind = "system"
+slot = 1
+source_id = ""
+level = 0.44
+muted = false
+outputs = []

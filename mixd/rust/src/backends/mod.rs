@@ -53,7 +53,11 @@ pub enum CaptureSource {
 }
 
 pub trait AudioBackend {
-    fn open_output(&mut self) -> BackendResult<()>;
+    /// Open (or re-open) the output stream for `bus` on the named device.
+    /// `device_name` is the cpal device name; `None` selects the OS default.
+    fn open_bus(&mut self, bus: usize, device_name: Option<&str>) -> BackendResult<()>;
+    fn close_bus(&mut self, bus: usize);
+    fn list_output_devices(&self) -> Vec<String>;
     fn start_capture(&mut self, channel: usize, source: CaptureSource) -> BackendResult<()>;
     fn stop_capture(&mut self, channel: usize) -> BackendResult<()>;
 }

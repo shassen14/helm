@@ -5,7 +5,7 @@ import logging
 import platform
 from pathlib import Path
 
-from mixd.python.constants import OUTPUT_BITS, ChannelKind
+from mixd.python.constants import BUS_INDEX, OUTPUT_BITS, ChannelKind
 
 _log = logging.getLogger(__name__)
 
@@ -46,6 +46,16 @@ def _load_lib() -> ctypes.CDLL | None:
     lib.mixd_start_capture_system.restype = ctypes.c_int32
     lib.mixd_stop_capture.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
     lib.mixd_stop_capture.restype = ctypes.c_int32
+    lib.mixd_set_bus_volume.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_float]
+    lib.mixd_set_bus_volume.restype = None
+    lib.mixd_open_bus.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_char_p]
+    lib.mixd_open_bus.restype = ctypes.c_int32
+    lib.mixd_close_bus.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    lib.mixd_close_bus.restype = None
+    lib.mixd_list_output_devices.argtypes = [ctypes.c_void_p]
+    lib.mixd_list_output_devices.restype = ctypes.c_void_p
+    lib.mixd_free_string.argtypes = [ctypes.c_void_p]
+    lib.mixd_free_string.restype = None
     return lib
 
 
@@ -66,6 +76,9 @@ class MixEngine:
         return self._ptr is not None
 
     def sync_state(self, mixer) -> None:
+        for bus_name, bus in mixer.buses.items():
+            self.set_bus_volume(bus_name, bus.volume)
+            self.open_bus(bus_name, bus.device_name)
         for ch in mixer.channels.values():
             self.set_level(ch.slot, ch.level)
             self.set_muted(ch.slot, ch.muted)
@@ -110,6 +123,36 @@ class MixEngine:
         if not self.available:
             return
         self._lib.mixd_stop_capture(self._ptr, slot)
+
+    def set_bus_volume(self, bus: str, volume: float) -> None:
+        if not self.available:
+            return
+        idx = BUS_INDEX.get(bus)
+        if idx is None:
+            return
+        self._lib.mixd_set_bus_volume(self._ptr, idx, volume)
+
+    def open_bus(self, bus: str, device_name: str | None) -> bool:
+        if not self.available:
+            return False
+        idx = BUS_INDEX.get(bus)
+        if idx is None:
+            return False
+        encoded = device_name.encode() if device_name else None
+        return self._lib.mixd_open_bus(self._ptr, idx, encoded) == 0
+
+    def list_output_devices(self) -> list[str]:
+        if not self.available:
+            return []
+        ptr = self._lib.mixd_list_output_devices(self._ptr)
+        if not ptr:
+            return []
+        try:
+            raw = ctypes.cast(ptr, ctypes.c_char_p).value or b""
+            text = raw.decode(errors="replace")
+        finally:
+            self._lib.mixd_free_string(ptr)
+        return [line for line in text.split("\n") if line]
 
     def close(self) -> None:
         if self._ptr is not None and self._lib is not None:

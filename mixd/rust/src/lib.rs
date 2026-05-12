@@ -1,10 +1,9 @@
 pub mod backends;
 mod engine;
-mod ipc;
 pub mod mixer;
 pub mod routing;
 
-use std::ffi::{c_char, c_void, CStr};
+use std::ffi::{c_char, c_void, CStr, CString};
 
 use backends::CaptureSource;
 use engine::Engine;
@@ -100,6 +99,71 @@ pub unsafe extern "C" fn mixd_start_capture_system(ptr: *mut c_void, ch: u32) ->
             eprintln!("mixd_start_capture_system ch {ch}: {e}");
             -1
         }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mixd_set_bus_volume(ptr: *mut c_void, bus: u32, gain: f32) {
+    if let Some(e) = (ptr as *mut Engine).as_ref() {
+        e.set_bus_volume(bus as usize, gain);
+    }
+}
+
+/// Open or re-open the output stream for `bus`. Pass `device_name = null` (or
+/// empty) to use the OS default device. Returns 0 on success, -1 on error.
+#[no_mangle]
+pub unsafe extern "C" fn mixd_open_bus(
+    ptr: *mut c_void,
+    bus: u32,
+    device_name: *const c_char,
+) -> i32 {
+    let Some(engine) = (ptr as *mut Engine).as_mut() else {
+        return -1;
+    };
+    let name: Option<String> = if device_name.is_null() {
+        None
+    } else {
+        match CStr::from_ptr(device_name).to_str() {
+            Ok("") => None,
+            Ok(s) => Some(s.to_string()),
+            Err(_) => return -1,
+        }
+    };
+    match engine.open_bus(bus as usize, name.as_deref()) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("mixd_open_bus bus {bus}: {e}");
+            -1
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mixd_close_bus(ptr: *mut c_void, bus: u32) {
+    if let Some(engine) = (ptr as *mut Engine).as_mut() {
+        engine.close_bus(bus as usize);
+    }
+}
+
+/// Return a newline-separated, NUL-terminated list of host output device
+/// names. Caller owns the buffer and must release it via `mixd_free_string`.
+/// Returns null on error.
+#[no_mangle]
+pub unsafe extern "C" fn mixd_list_output_devices(ptr: *mut c_void) -> *mut c_char {
+    let Some(engine) = (ptr as *mut Engine).as_ref() else {
+        return std::ptr::null_mut();
+    };
+    let joined = engine.list_output_devices().join("\n");
+    match CString::new(joined) {
+        Ok(s) => s.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mixd_free_string(s: *mut c_char) {
+    if !s.is_null() {
+        drop(CString::from_raw(s));
     }
 }
 

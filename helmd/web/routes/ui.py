@@ -42,6 +42,11 @@ _MIXER_HTML = """<!DOCTYPE html>
 </head>
 <body>
 <h1>mixer</h1>
+
+<h2>outputs</h2>
+<div id="outputs">loading…</div>
+
+<h2>channels</h2>
 <div id="channels">loading…</div>
 
 <h2>add channel</h2>
@@ -58,7 +63,9 @@ const POLL_MS = 2000;
 const LEVEL_DEBOUNCE_MS = 80;
 
 const levelTimers = {};
+const busVolumeTimers = {};
 let appsCache = [];
+let outputDevicesCache = [];
 
 async function api(method, path, body) {
   const opts = { method, headers: {} };
@@ -74,6 +81,66 @@ async function api(method, path, body) {
   }
   if (r.status === 204) return null;
   return r.json();
+}
+
+function renderOutputs(outputs) {
+  const root = document.getElementById("outputs");
+  root.innerHTML = "";
+  for (const bus of OUTPUTS) {
+    const cfg = outputs[bus] || { volume: 1.0, device_name: null };
+    const card = document.createElement("div");
+    card.className = "channel";
+
+    const top = document.createElement("div");
+    top.className = "row";
+    const label = document.createElement("span");
+    label.className = "name";
+    label.textContent = bus;
+    top.append(label);
+
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = 0; slider.max = 1; slider.step = 0.01;
+    slider.value = cfg.volume;
+    slider.className = "level";
+    slider.addEventListener("input", () => {
+      clearTimeout(busVolumeTimers[bus]);
+      busVolumeTimers[bus] = setTimeout(async () => {
+        try { await api("PUT", `/mixer/outputs/${encodeURIComponent(bus)}`, { volume: parseFloat(slider.value) }); }
+        catch (e) { setFooter(`${bus} volume failed: ${e.message}`, true); }
+      }, LEVEL_DEBOUNCE_MS);
+    });
+    top.append(slider);
+    card.append(top);
+
+    const devRow = document.createElement("div");
+    devRow.className = "row";
+    const devLabel = document.createElement("span");
+    devLabel.textContent = "device";
+    devRow.append(devLabel);
+
+    const sel = document.createElement("select");
+    sel.style.flex = "1";
+    const defaultOpt = document.createElement("option");
+    defaultOpt.value = "";
+    defaultOpt.textContent = "(OS default)";
+    sel.append(defaultOpt);
+    for (const name of outputDevicesCache) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      sel.append(opt);
+    }
+    sel.value = cfg.device_name || "";
+    sel.addEventListener("change", async () => {
+      try { await api("PUT", `/mixer/outputs/${encodeURIComponent(bus)}`, { device_name: sel.value }); }
+      catch (e) { setFooter(`${bus} device failed: ${e.message}`, true); }
+    });
+    devRow.append(sel);
+    card.append(devRow);
+
+    root.append(card);
+  }
 }
 
 function renderChannels(channels) {
@@ -219,7 +286,11 @@ function setFooter(msg, isErr) {
 
 async function refresh() {
   try {
-    const channels = await api("GET", "/mixer/channels");
+    const [channels, outputs] = await Promise.all([
+      api("GET", "/mixer/channels"),
+      api("GET", "/mixer/outputs"),
+    ]);
+    renderOutputs(outputs);
     renderChannels(channels);
     renderAddOptions(appsCache, new Set(Object.keys(channels)));
     setFooter(`mixd ok · ${Object.keys(channels).length} channels`);
@@ -231,6 +302,8 @@ async function refresh() {
 async function init() {
   try { appsCache = await api("GET", "/mixer/apps"); }
   catch (e) { appsCache = []; setFooter(`apps unavailable: ${e.message}`, true); }
+  try { outputDevicesCache = await api("GET", "/mixer/output-devices"); }
+  catch (e) { outputDevicesCache = []; }
   document.getElementById("add-btn").addEventListener("click", addChannel);
   await refresh();
   setInterval(refresh, POLL_MS);

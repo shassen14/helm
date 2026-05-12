@@ -77,6 +77,22 @@ async def get_devices(request: Request) -> Response:
     return await _proxy(request, "GET", "/devices")
 
 
+@router.get("/output-devices")
+async def get_output_devices(request: Request) -> Response:
+    return await _proxy(request, "GET", "/output-devices")
+
+
+@router.get("/outputs")
+async def get_outputs(request: Request) -> Response:
+    return await _proxy(request, "GET", "/outputs")
+
+
+@router.put("/outputs/{bus}")
+async def set_output(bus: str, request: Request) -> Response:
+    body = await request.json()
+    return await _proxy(request, "PUT", f"/outputs/{bus}", json=body)
+
+
 @router.get("/status")
 async def get_status(request: Request) -> Response:
     return await _proxy(request, "GET", "/status")

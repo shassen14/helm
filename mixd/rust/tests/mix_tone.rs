@@ -107,6 +107,50 @@ fn routing_mask_gates_output_bus() {
 }
 
 #[test]
+fn bus_gain_scales_output() {
+    let mixer = Mixer::new();
+    mixer.matrix.set_outputs(0, OUT_STREAM);
+    mixer.matrix.set_gain(0, 1.0);
+    mixer.matrix.set_bus_gain(0, 0.25);
+
+    let frames = 512;
+    let input = tone(frames, 440.0, 0.5);
+    let expected_rms = rms(&input) * 0.25;
+    mixer.push_samples(0, &input);
+
+    let mut out = vec![0.0f32; frames * CH];
+    mixer.mix_into(&mut out, OUT_STREAM);
+
+    let got_rms = rms(&out);
+    assert!(
+        (got_rms - expected_rms).abs() < 1e-5,
+        "bus gain: expected rms {expected_rms}, got {got_rms}"
+    );
+}
+
+#[test]
+fn buses_drain_independently() {
+    // Channel routed to STREAM + MONITOR: each bus must see the full signal.
+    // (Pre-Milestone-4 single-ring design would have starved one of them.)
+    let mixer = Mixer::new();
+    mixer.matrix.set_outputs(0, OUT_STREAM | OUT_MONITOR);
+    mixer.matrix.set_gain(0, 1.0);
+
+    let frames = 512;
+    let input = tone(frames, 440.0, 0.5);
+    let expected_rms = rms(&input);
+    mixer.push_samples(0, &input);
+
+    let mut stream_out = vec![0.0f32; frames * CH];
+    let mut monitor_out = vec![0.0f32; frames * CH];
+    mixer.mix_into(&mut stream_out, OUT_STREAM);
+    mixer.mix_into(&mut monitor_out, OUT_MONITOR);
+
+    assert!((rms(&stream_out) - expected_rms).abs() < 1e-5);
+    assert!((rms(&monitor_out) - expected_rms).abs() < 1e-5);
+}
+
+#[test]
 fn channels_sum_into_same_bus() {
     let mixer = Mixer::new();
     assert!(N_CHANNELS >= 2);

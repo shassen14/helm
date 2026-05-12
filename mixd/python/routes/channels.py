@@ -96,6 +96,7 @@ async def create_channel(body: CreateChannelBody, request: Request) -> dict:
         del mixer.channels[cid]
         raise HTTPException(status_code=502, detail="failed to start capture")
 
+    request.app.state.persist()
     return _serialize(ch)
 
 
@@ -107,6 +108,7 @@ async def delete_channel(channel: str, request: Request) -> dict:
         raise HTTPException(status_code=404, detail=f"unknown channel: {channel}")
     request.app.state.engine.stop_capture(ch.slot)
     del mixer.channels[channel]
+    request.app.state.persist()
     return {"id": channel, "removed": True}
 
 
@@ -118,6 +120,7 @@ async def set_level(channel: str, body: LevelBody, request: Request) -> dict:
         raise HTTPException(status_code=404, detail=f"unknown channel: {channel}")
     ch.level = body.level
     request.app.state.engine.set_level(ch.slot, body.level)
+    request.app.state.persist()
     return _serialize(ch)
 
 
@@ -129,4 +132,5 @@ async def set_mute(channel: str, body: MuteBody, request: Request) -> dict:
         raise HTTPException(status_code=404, detail=f"unknown channel: {channel}")
     ch.muted = body.muted
     request.app.state.engine.set_muted(ch.slot, body.muted)
+    request.app.state.persist()
     return _serialize(ch)

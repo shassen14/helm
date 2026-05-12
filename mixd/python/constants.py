@@ -24,3 +24,11 @@ OUTPUT_BITS: dict[str, int] = {
     MixOutput.MONITOR: 0b010,
     MixOutput.CHAT: 0b100,
 }
+
+# Bus index must match the order of `BUS_BITS` in `mixd/rust/src/routing.rs`.
+# Drives `mixd_set_bus_volume` / `mixd_open_bus` FFI calls.
+BUS_INDEX: dict[str, int] = {
+    MixOutput.STREAM: 0,
+    MixOutput.MONITOR: 1,
+    MixOutput.CHAT: 2,
+}

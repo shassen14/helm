@@ -1,8 +1,8 @@
 //! Cross-platform audio I/O via cpal.
 //!
 //! cpal already abstracts CoreAudio (macOS), WASAPI (Windows), and
-//! ALSA / JACK / PipeWire (Linux), so the default-output stream and the
-//! default-input (mic) stream live here and are shared by every OS backend.
+//! ALSA / JACK / PipeWire (Linux), so output streams and the default-input
+//! (mic) stream live here and are shared by every OS backend.
 
 use std::sync::Arc;
 
@@ -14,18 +14,31 @@ use crate::mixer::Mixer;
 pub type IoError = Box<dyn std::error::Error>;
 pub type IoResult<T> = Result<T, IoError>;
 
-/// Open the OS default output device and start a stream that pulls a mix of
-/// every channel routed to `output_bit` on each callback. Stereo passes
-/// straight through; mono downmixes; >2-ch device layouts get L/R into the
-/// first two slots with the rest zeroed.
-pub fn open_default_output_stream(
+/// Enumerate the host's output devices by name. The names are what
+/// `open_output_stream_on` matches against. Returns at most the host's
+/// reported devices; on error returns an empty list (logged to stderr).
+pub fn list_output_devices() -> Vec<String> {
+    let host = cpal::default_host();
+    match host.output_devices() {
+        Ok(iter) => iter.filter_map(|d| d.name().ok()).collect(),
+        Err(e) => {
+            eprintln!("[mixd] list_output_devices: {e}");
+            Vec::new()
+        }
+    }
+}
+
+/// Open an output stream that pulls a mix of every channel routed to
+/// `output_bit` on each callback. When `device_name` is `Some`, the host's
+/// device with that name is used; otherwise the OS default is used. If the
+/// requested name is not found, falls back to the default with a warning.
+pub fn open_output_stream_on(
     mixer: Arc<Mixer>,
     output_bit: u32,
+    device_name: Option<&str>,
 ) -> IoResult<cpal::Stream> {
     let host = cpal::default_host();
-    let device = host
-        .default_output_device()
-        .ok_or_else(|| -> IoError { "no default output device".into() })?;
+    let device = pick_output_device(&host, device_name)?;
     let cfg = device.default_output_config().map_err(|e| -> IoError {
         format!("default_output_config: {e}").into()
     })?;
@@ -57,6 +70,21 @@ pub fn open_default_output_stream(
         .play()
         .map_err(|e| -> IoError { format!("play output stream: {e}").into() })?;
     Ok(stream)
+}
+
+fn pick_output_device(host: &cpal::Host, name: Option<&str>) -> IoResult<cpal::Device> {
+    if let Some(want) = name {
+        if let Ok(iter) = host.output_devices() {
+            for d in iter {
+                if d.name().ok().as_deref() == Some(want) {
+                    return Ok(d);
+                }
+            }
+        }
+        eprintln!("[mixd] output device {want:?} not found; using default");
+    }
+    host.default_output_device()
+        .ok_or_else(|| -> IoError { "no default output device".into() })
 }
 
 /// Open the OS default input device and push samples into `channel` of the
