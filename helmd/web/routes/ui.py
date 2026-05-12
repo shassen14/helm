@@ -161,9 +161,7 @@ function renderChannels(channels) {
   }
 }
 
-function renderAddOptions(apps, existingIds) {
-  const sel = document.getElementById("add-source");
-  sel.innerHTML = "";
+function computeAddOptions(apps, existingIds) {
   const opts = [];
   if (!existingIds.has("mic")) opts.push({ value: "mic", label: "Mic (input device)" });
   if (!existingIds.has("system")) opts.push({ value: "system", label: "System (full mix)" });
@@ -172,6 +170,19 @@ function renderAddOptions(apps, existingIds) {
       opts.push({ value: `app:${a.bundleIdentifier}`, label: `${a.applicationName} (${a.bundleIdentifier})` });
     }
   }
+  return opts;
+}
+
+function renderAddOptions(apps, existingIds) {
+  const sel = document.getElementById("add-source");
+  const opts = computeAddOptions(apps, existingIds);
+  const newSig = opts.map(o => o.value).join("|");
+  // Skip rebuild when nothing changed — otherwise the 2 s poll wipes the
+  // user's pending selection before they click "add".
+  if (sel.dataset.sig === newSig) return;
+  sel.dataset.sig = newSig;
+  const prev = sel.value;
+  sel.innerHTML = "";
   if (!opts.length) {
     sel.innerHTML = "<option value=''>nothing left to add</option>";
     return;
@@ -182,6 +193,7 @@ function renderAddOptions(apps, existingIds) {
     el.textContent = o.label;
     sel.append(el);
   }
+  if (prev && opts.some(o => o.value === prev)) sel.value = prev;
 }
 
 async function addChannel() {
